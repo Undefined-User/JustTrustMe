@@ -20,6 +20,7 @@ import java.security.UnrecoverableKeyException;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
@@ -153,6 +154,20 @@ public class Main implements IXposedHookLoadPackage {
                 return null;
             }
         });
+
+        /* libcore/luni/src/main/java/javax/net/ssl/HttpsURLConnection.java */
+        /* public void HostnameVerifier getDefaultHostnameVerifier() */
+        findAndHookMethod("javax.net.ssl.HttpsURLConnection", lpparam.classLoader, "getDefaultHostnameVerifier",
+                            new XC_MethodReplacement() {
+            @Override
+            protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                return new HostnameVerifier() {
+                    public boolean verify(String string, SSLSession sslSession) {
+                        return true;
+                    }};
+            }
+        });
+
 
         /* libcore/luni/src/main/java/javax/net/ssl/HttpsURLConnection.java */
         /* public void setSSLSocketFactory(SSLSocketFactory) */
