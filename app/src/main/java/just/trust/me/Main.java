@@ -371,6 +371,33 @@ public class Main implements IXposedHookLoadPackage {
             Log.d(TAG, "OKHTTP 2.5 not found in "  + currentPackageName  + "-- not hooking");
         }
 
+        Log.d(TAG, "Hooking okhttp3.Address.sslSocketFactory() (3.x) for: " + currentPackageName);
+        try {
+            classLoader.loadClass("okhttp3.Address");
+            findAndHookMethod("okhttp3.Address", classLoader, "sslSocketFactory", new XC_MethodReplacement() {
+                @Override
+                protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                    SSLContext sslContext = SSLContext.getInstance("TLS");
+
+                    TrustManager tm = new X509TrustManager() {
+                        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+                        }
+                        public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+                        }
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return null;
+                        }
+                    };
+
+                    sslContext.init(null, new TrustManager[] { tm }, null);
+
+                    return sslContext.getSocketFactory();
+                }
+            });
+        } catch (ClassNotFoundException e) {
+            Log.d(TAG, "OKHTTP okhttp3.Address not found in "  + currentPackageName  + "-- not hooking");
+        }
+
         //https://github.com/square/okhttp/blob/parent-3.0.1/okhttp/src/main/java/okhttp3/CertificatePinner.java#L144
         Log.d(TAG, "Hooking okhttp3.CertificatePinner.check(String,List) (3.x) for: " + currentPackageName);
 

@@ -9,3 +9,5 @@ build/
 /local.properties
 /.idea/workspace.xml
 .DS_Store
+*.keystore
+app/app-release.apk
