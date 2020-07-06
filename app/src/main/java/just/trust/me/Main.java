@@ -41,6 +41,7 @@ import javax.net.ssl.X509TrustManager;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XC_MethodReplacement;
+import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
 import static de.robv.android.xposed.XposedHelpers.callMethod;
@@ -60,9 +61,37 @@ public class Main implements IXposedHookLoadPackage {
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
 
         currentPackageName = lpparam.packageName;
+        try {
+            Class ConfigBuilder = findClass("android.security.net.config.NetworkSecurityConfig.Builder", lpparam.classLoader);
+            findAndHookMethod(ConfigBuilder, "build", new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                    super.beforeHookedMethod(param);
+                    try {
+                        Class CertificatesEntryRef = findClass("android.security.net.config.CertificatesEntryRef", lpparam.classLoader);
+                        Class SystemCertificateSource = findClass("android.security.net.config.SystemCertificateSource", lpparam.classLoader);
+                        Object SystemCertificateSourceObj = XposedHelpers.callStaticMethod(SystemCertificateSource, "getInstance");
+                        Class UserCertificateSource = findClass("android.security.net.config.UserCertificateSource", lpparam.classLoader);
+                        Object UserCertificateSourceObj = XposedHelpers.callStaticMethod(UserCertificateSource, "getInstance");
+                        Object SystemCertificateEntryObj = XposedHelpers.newInstance(CertificatesEntryRef, SystemCertificateSourceObj, false);
+                        Object UserCertificateEntryObj = XposedHelpers.newInstance(CertificatesEntryRef, UserCertificateSourceObj, false);
+                        List refs = (List) XposedHelpers.callMethod(param.thisObject, "getCertificatesEntryRefs");
+                        if (refs == null || !refs.contains(SystemCertificateEntryObj)) {
+                            XposedHelpers.callMethod(param.thisObject, "addCertificatesEntryRef", SystemCertificateEntryObj);
+                        }
+                        if (refs == null || !refs.contains(UserCertificateEntryObj)) {
+                            XposedHelpers.callMethod(param.thisObject, "addCertificatesEntryRef", UserCertificateEntryObj);
+                        }
+                    } catch (Throwable e) {
 
+                    }
+                }
+            });
+        } catch (Throwable e) {
 
+        }
 
+        try {
         /* Apache Hooks */
         /* external/apache-http/src/org/apache/http/impl/client/DefaultHttpClient.java */
         /* public DefaultHttpClient() */
@@ -187,15 +216,16 @@ public class Main implements IXposedHookLoadPackage {
         /* libcore/luni/src/main/java/javax/net/ssl/HttpsURLConnection.java */
         /* public void HostnameVerifier getDefaultHostnameVerifier() */
         findAndHookMethod("javax.net.ssl.HttpsURLConnection", lpparam.classLoader, "getDefaultHostnameVerifier",
-                            new XC_MethodReplacement() {
-            @Override
-            protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
-                return new HostnameVerifier() {
-                    public boolean verify(String string, SSLSession sslSession) {
-                        return true;
-                    }};
-            }
-        });
+                new XC_MethodReplacement() {
+                    @Override
+                    protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                        return new HostnameVerifier() {
+                            public boolean verify(String string, SSLSession sslSession) {
+                                return true;
+                            }
+                        };
+                    }
+                });
 
 
         /* libcore/luni/src/main/java/javax/net/ssl/HttpsURLConnection.java */
@@ -293,8 +323,8 @@ public class Main implements IXposedHookLoadPackage {
                         }
                     });
 
-            /* public List<X509Certificate> checkServerTrusted(X509Certificate[] chain,
-                                    String authType, String host) throws CertificateException */
+        /* public List<X509Certificate> checkServerTrusted(X509Certificate[] chain,
+                                String authType, String host) throws CertificateException */
             findAndHookMethod("com.android.org.conscrypt.TrustManagerImpl", lpparam.classLoader,
                     "checkServerTrusted", X509Certificate[].class, String.class,
                     String.class, new XC_MethodReplacement() {
@@ -306,8 +336,8 @@ public class Main implements IXposedHookLoadPackage {
                     });
 
 
-            /* public List<X509Certificate> checkServerTrusted(X509Certificate[] chain,
-                                    String authType, SSLSession session) throws CertificateException */
+        /* public List<X509Certificate> checkServerTrusted(X509Certificate[] chain,
+                                String authType, SSLSession session) throws CertificateException */
             findAndHookMethod("com.android.org.conscrypt.TrustManagerImpl", lpparam.classLoader,
                     "checkServerTrusted", X509Certificate[].class, String.class,
                     SSLSession.class, new XC_MethodReplacement() {
@@ -317,6 +347,9 @@ public class Main implements IXposedHookLoadPackage {
                             return list;
                         }
                     });
+        }
+        } catch (Throwable e) {
+
         }
 
     } // End Hooks
@@ -469,20 +502,22 @@ public class Main implements IXposedHookLoadPackage {
                     TrustManager tm = new X509TrustManager() {
                         public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
                         }
+
                         public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
                         }
+
                         public X509Certificate[] getAcceptedIssuers() {
                             return null;
                         }
                     };
 
-                    sslContext.init(null, new TrustManager[] { tm }, null);
+                    sslContext.init(null, new TrustManager[]{tm}, null);
 
                     return sslContext.getSocketFactory();
                 }
             });
         } catch (ClassNotFoundException e) {
-            Log.d(TAG, "OKHTTP okhttp3.Address not found in "  + currentPackageName  + "-- not hooking");
+            Log.d(TAG, "OKHTTP okhttp3.Address not found in " + currentPackageName + "-- not hooking");
         }
 
         //https://github.com/square/okhttp/blob/parent-3.0.1/okhttp/src/main/java/okhttp3/CertificatePinner.java#L144
@@ -575,10 +610,10 @@ public class Main implements IXposedHookLoadPackage {
         public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
         }
 
-	public List<X509Certificate> checkServerTrusted(X509Certificate[] chain, String authType, String host) throws CertificateException {
-		ArrayList<X509Certificate> list = new ArrayList<X509Certificate>();
-		return list;
-	}
+        public List<X509Certificate> checkServerTrusted(X509Certificate[] chain, String authType, String host) throws CertificateException {
+            ArrayList<X509Certificate> list = new ArrayList<X509Certificate>();
+            return list;
+        }
 
         @Override
         public X509Certificate[] getAcceptedIssuers() {
