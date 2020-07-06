@@ -185,6 +185,20 @@ public class Main implements IXposedHookLoadPackage {
                 });
 
         /* libcore/luni/src/main/java/javax/net/ssl/HttpsURLConnection.java */
+        /* public void HostnameVerifier getDefaultHostnameVerifier() */
+        findAndHookMethod("javax.net.ssl.HttpsURLConnection", lpparam.classLoader, "getDefaultHostnameVerifier",
+                            new XC_MethodReplacement() {
+            @Override
+            protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                return new HostnameVerifier() {
+                    public boolean verify(String string, SSLSession sslSession) {
+                        return true;
+                    }};
+            }
+        });
+
+
+        /* libcore/luni/src/main/java/javax/net/ssl/HttpsURLConnection.java */
         /* public void setSSLSocketFactory(SSLSocketFactory) */
         Log.d(TAG, "Hooking HttpsURLConnection.setSSLSocketFactory for: " + currentPackageName);
         findAndHookMethod("javax.net.ssl.HttpsURLConnection", lpparam.classLoader, "setSSLSocketFactory", javax.net.ssl.SSLSocketFactory.class,
