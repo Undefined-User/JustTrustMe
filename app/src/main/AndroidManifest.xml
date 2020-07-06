@@ -16,5 +16,5 @@
             android:name="xposeddescription"
             android:value="Kills SSL certificate validation" />
     </application>
-    
+
 </manifest>
